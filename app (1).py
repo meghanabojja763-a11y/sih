@@ -22,7 +22,7 @@ def add_employee(employees_df, new_employee):
     new_employee['EmployeeID'] = generate_unique_employee_id()
     employees_df = pd.concat([employees_df, pd.DataFrame([new_employee])], ignore_index=True)
     st.success(f"Added new employee with ID {new_employee['EmployeeID']}")
-    employees_df.to_csv('Employee_with_ID_with_random_skills.csv', index=False)
+    employees_df.to_csv('Employee_with_ID_with_random_skills (1).csv', index=False)
     return employees_df
 
 def update_employee(employees_df, employee_id, updated_fields):
@@ -32,7 +32,7 @@ def update_employee(employees_df, employee_id, updated_fields):
     for key, value in updated_fields.items():
         employees_df.loc[employees_df['EmployeeID'] == employee_id, key] = value
     st.success(f"Updated employee {employee_id} with fields {updated_fields}")
-    employees_df.to_csv('Employee_with_ID_with_random_skills.csv', index=False)
+    employees_df.to_csv('Employee_with_ID_with_random_skills (1).csv', index=False)
     return employees_df
 
 def delete_employee(employees_df, employee_id):
@@ -41,7 +41,7 @@ def delete_employee(employees_df, employee_id):
         return employees_df
     employees_df = employees_df.drop(employees_df[employees_df['EmployeeID'] == employee_id].index)
     st.success(f"Deleted employee with ID {employee_id}")
-    employees_df.to_csv('/content/Employee_with_ID_with_random_skills (1).csv', index=False)
+    employees_df.to_csv('Employee_with_ID_with_random_skills (1).csv', index=False)
     return employees_df
 
 def add_project(projects_df, new_project):
@@ -53,7 +53,7 @@ def add_project(projects_df, new_project):
 # Load data
 @st.cache_data
 def load_employees():
-    return pd.read_csv('/content/Employee_with_ID_with_random_skills (1).csv')
+    return pd.read_csv('Employee_with_ID_with_random_skills (1).csv')
 
 @st.cache_data
 def load_projects():
