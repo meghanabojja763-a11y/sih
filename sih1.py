@@ -22,7 +22,7 @@ def add_employee(employees_df, new_employee):
     new_employee['EmployeeID'] = generate_unique_employee_id()
     employees_df = pd.concat([employees_df, pd.DataFrame([new_employee])], ignore_index=True)
     print(f"Added new employee with ID {new_employee['EmployeeID']}")
-    employees_df.to_csv('/content/Employee_with_ID_with_random_skills (1).csv', index=False)
+    employees_df.to_csv('Employee_with_ID_with_random_skills (1).csv', index=False)
     return employees_df
 
 # Update an existing employee by EmployeeID
@@ -32,7 +32,7 @@ def update_employee(employees_df, employee_id, updated_fields):
     for key, value in updated_fields.items():
         employees_df.loc[employees_df['EmployeeID'] == employee_id, key] = value
     print(f"Updated employee {employee_id} with fields {updated_fields}")
-    employees_df.to_csv('/content/Employee_with_ID_with_random_skills (1).csv', index=False)
+    employees_df.to_csv('Employee_with_ID_with_random_skills (1).csv', index=False)
     return employees_df
 
 # Delete an employee by EmployeeID
@@ -41,7 +41,7 @@ def delete_employee(employees_df, employee_id):
         raise ValueError(f"EmployeeID {employee_id} not found. Cannot delete non-existent employee.")
     employees_df = employees_df.drop(employees_df[employees_df['EmployeeID'] == employee_id].index)
     print(f"Deleted employee with ID {employee_id}")
-    employees_df.to_csv('/content/Employee_with_ID_with_random_skills (1).csv', index=False)
+    employees_df.to_csv('Employee_with_ID_with_random_skills (1).csv', index=False)
     return employees_df
 
 # Interactive delete employee
@@ -55,7 +55,7 @@ def delete_employee_interactive(employees_df):
         return employees_df
     employees_df = employees_df.drop(employees_df[employees_df['EmployeeID'] == employee_id].index)
     print(f"Deleted employee with ID {employee_id}")
-    employees_df.to_csv('/content/Employee_with_ID_with_random_skills (1).csv', index=False)
+    employees_df.to_csv('Employee_with_ID_with_random_skills (1).csv', index=False)
     return employees_df
 
 # Interactive add project
@@ -79,14 +79,14 @@ def add_project_interactive(projects_df):
     }
 
     projects_df = pd.concat([projects_df, pd.DataFrame([new_project])], ignore_index=True)
-    projects_df.to_csv('/content/project_tasks_500.csv', index=False)
+    projects_df.to_csv('project_tasks_500.csv', index=False)
     print(f"Added new project '{project_name}' with sub task '{sub_task}' and saved to CSV.")
 
     return projects_df
 
 # Load employees and projects CSV files
-employees = pd.read_csv('/content/Employee_with_ID_with_random_skills (1).csv')
-projects = pd.read_csv('/content/project_tasks_500.csv')
+employees = pd.read_csv('Employee_with_ID_with_random_skills (1).csv')
+projects = pd.read_csv('project_tasks_500.csv')
 
 # Interactive section to add a new employee
 user_input = input("Do you want to add a new employee? (yes/no): ").strip().lower()
@@ -157,7 +157,7 @@ projects = add_project_interactive(projects)
 
 # Attempt to load completed projects CSV file
 try:
-    completed_projects = pd.read_csv('/content/completed_projects.csv')
+    completed_projects = pd.read_csv('completed_projects.csv')
 except FileNotFoundError:
     completed_projects = pd.DataFrame(columns=projects.columns)
 
@@ -176,12 +176,12 @@ projects = projects[~completed_mask]
 completed_projects = pd.concat([completed_projects, completed_now], ignore_index=True)
 
 # Save updated DataFrames back to CSV
-projects.to_csv('/content/project_tasks_500.csv', index=False)  # active/incomplete projects
-completed_projects.to_csv('/content/completed_projects.csv', index=False)  # completed projects
+projects.to_csv('project_tasks_500.csv', index=False)  # active/incomplete projects
+completed_projects.to_csv('completed_projects.csv', index=False)  # completed projects
 
 print(f"Moved {len(completed_now)} completed projects to completed_projects.csv")
 
-assigned_tasks=pd.read_csv("/content/project_task_assignments.csv")
+assigned_tasks=pd.read_csv("project_task_assignments.csv")
 are_all_unique = assigned_tasks['Assigned EmployeeID'].dropna().is_unique
 
 print(are_all_unique)
