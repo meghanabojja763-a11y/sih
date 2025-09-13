@@ -47,35 +47,35 @@ def move_employee_to_assigned(employee_id, employees_df, employee_file, assigned
     """Move employee from employees_df to assigned_employees.csv"""
     if employee_id not in employees_df['EmployeeID'].values:
         return employees_df  # nothing to do
+    # Try reading the assigned employees file, create if empty/malformed
     try:
         assigned_df = pd.read_csv(assigned_file)
-    except FileNotFoundError:
+        if assigned_df.empty or list(assigned_df.columns) != list(employees_df.columns):
+            assigned_df = pd.DataFrame(columns=employees_df.columns)
+    except Exception:
         assigned_df = pd.DataFrame(columns=employees_df.columns)
     emp_row = employees_df[employees_df['EmployeeID'] == employee_id]
-    # Append to assigned.csv
     assigned_df = pd.concat([assigned_df, emp_row], ignore_index=True)
     assigned_df.to_csv(assigned_file, index=False)
-    # Remove from employees.csv
     employees_df = employees_df.drop(emp_row.index)
     employees_df.to_csv(employee_file, index=False)
     return employees_df
 
 def move_employee_back_to_employees(employee_id, employee_file="Employee_with_ID_with_random_skills.csv", assigned_file="assigned_employees.csv"):
-    """Move employee back to employee file after task completion"""
     employees_df = pd.read_csv(employee_file)
     try:
         assigned_df = pd.read_csv(assigned_file)
-    except FileNotFoundError:
+        if assigned_df.empty or list(assigned_df.columns) != list(employees_df.columns):
+            assigned_df = pd.DataFrame(columns=employees_df.columns)
+    except Exception:
         st.warning("No assigned employees file found.")
         return employees_df
     if employee_id not in assigned_df['EmployeeID'].values:
         st.warning(f"Employee {employee_id} not found in assigned list.")
         return employees_df
     emp_row = assigned_df[assigned_df['EmployeeID'] == employee_id]
-    # Add back to employees.csv
     employees_df = pd.concat([employees_df, emp_row], ignore_index=True)
     employees_df.to_csv(employee_file, index=False)
-    # Remove from assigned.csv
     assigned_df = assigned_df.drop(emp_row.index)
     assigned_df.to_csv(assigned_file, index=False)
     st.success(f"Employee {employee_id} moved back to employee list after completing task.")
@@ -88,10 +88,8 @@ project_file_upload = st.sidebar.file_uploader("Upload Project CSV", type=["csv"
 if not employee_file_upload or not project_file_upload:
     st.warning("Please upload both Employee and Project CSV files to proceed.")
     st.stop()
-
 employee_file = "Employee_with_ID_with_random_skills.csv"
 project_file = "project_tasks_500.csv"
-
 with open(employee_file, "wb") as f:
     f.write(employee_file_upload.getbuffer())
 with open(project_file, "wb") as f:
@@ -106,9 +104,9 @@ def load_projects(path):
     df = pd.read_csv(path)
     df['Deadline'] = pd.to_datetime(df['Deadline'], errors='coerce')
     return df
+
 employees = load_employees(employee_file)
 projects = load_projects(project_file)
-
 st.title("Employee and Project Management Dashboard")
 
 # ---------- Add new employee ----------
@@ -191,11 +189,12 @@ projects_sorted = projects.sort_values(by='Deadline').reset_index(drop=True)
 assignments = []
 employee_project_map = {}
 
-# Load assigned employees to exclude them
 try:
     assigned_employees_df = pd.read_csv("assigned_employees.csv")
+    if assigned_employees_df.empty or list(assigned_employees_df.columns) != list(employees.columns):
+        assigned_employees_df = pd.DataFrame(columns=employees.columns)
     assigned_ids = set(assigned_employees_df['EmployeeID'].values)
-except FileNotFoundError:
+except Exception:
     assigned_employees_df = pd.DataFrame(columns=employees.columns)
     assigned_ids = set()
 
@@ -210,7 +209,6 @@ for i, task in projects_sorted.iterrows():
         assigned_employee = random.choice(available_employees)
         employee_project_map.setdefault(assigned_employee, set()).add(task['Project Name'])
         employees = move_employee_to_assigned(assigned_employee, employees, employee_file)
-
     assignments.append({
         'Project Name': task['Project Name'],
         'Deadline': task['Deadline'],
@@ -218,59 +216,47 @@ for i, task in projects_sorted.iterrows():
         'Skills Required': task['Skills Required'],
         'Assigned EmployeeID': assigned_employee
     })
-
 df_assignments = pd.DataFrame(assignments)
 df_assignments.to_csv("project_task_assignments.csv", index=False)
 st.success("✅ Assignments saved to project_task_assignments.csv")
 st.dataframe(df_assignments)
-
 # Provide assigned employees dataframe and download option
 try:
     assigned_employees_df = pd.read_csv("assigned_employees.csv")
-except FileNotFoundError:
+    if assigned_employees_df.empty or list(assigned_employees_df.columns) != list(employees.columns):
+        assigned_employees_df = pd.DataFrame(columns=employees.columns)
+except Exception:
     assigned_employees_df = pd.DataFrame(columns=employees.columns)
 st.subheader("Assigned Employees")
 st.dataframe(assigned_employees_df)
 csv_data = assigned_employees_df.to_csv(index=False).encode('utf-8')
 st.download_button(label="Download Assigned Employees CSV", data=csv_data, file_name="assigned_employees.csv", mime='text/csv')
-
 # ---------- Auto-move employees back if deadline passed and handle completed tasks ----------
-# Reload assigned employees
 try:
     assigned_employees_df = pd.read_csv("assigned_employees.csv")
-except FileNotFoundError:
+    if assigned_employees_df.empty or list(assigned_employees_df.columns) != list(employees.columns):
+        assigned_employees_df = pd.DataFrame(columns=employees.columns)
+except Exception:
     assigned_employees_df = pd.DataFrame(columns=employees.columns)
-
 # Reload assignments
 assignments_df = pd.read_csv("project_task_assignments.csv")
 assignments_df['Deadline'] = pd.to_datetime(assignments_df['Deadline'], errors='coerce')
-
-# Load or create completed tasks dataframe
+# Load or create completed tasks dataframe with correct columns
 try:
     completed_tasks_df = pd.read_csv("completed_task.csv")
-except FileNotFoundError:
+    if not set(assignments_df.columns).issubset(set(completed_tasks_df.columns)):
+        completed_tasks_df = pd.DataFrame(columns=assignments_df.columns)
+except Exception:
     completed_tasks_df = pd.DataFrame(columns=assignments_df.columns)
-
-# Today's date for comparisons
 today = pd.to_datetime(datetime.now().date())
-
-# Find tasks past deadline and with assigned employee
 past_due_mask = (assignments_df['Deadline'] < today) & assignments_df['Assigned EmployeeID'].notnull()
-
-# Move past due tasks to completed_tasks_df
 completed_tasks_df = pd.concat([completed_tasks_df, assignments_df[past_due_mask]], ignore_index=True)
 completed_tasks_df.to_csv("completed_task.csv", index=False)
-
-# Remove past due tasks from assignments_df
 assignments_df = assignments_df[~past_due_mask]
 assignments_df.to_csv("project_task_assignments.csv", index=False)
-
-# Auto-move employees back for completed tasks
 for _, row in completed_tasks_df.iterrows():
     emp_id = row['Assigned EmployeeID']
     employees = move_employee_back_to_employees(emp_id, employee_file)
-
-# Show completed tasks dataframe and download button
 st.subheader("Completed Tasks")
 st.dataframe(completed_tasks_df)
 completed_csv_data = completed_tasks_df.to_csv(index=False).encode('utf-8')
