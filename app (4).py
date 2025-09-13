@@ -4,13 +4,9 @@ import random
 import uuid
 from datetime import datetime
 
-
 # ---------- Utility Functions ----------
-
-
 def generate_unique_employee_id():
     return "E" + str(uuid.uuid4()).split('-')[0]  # e.g. E4a59bf4e
-
 
 def add_employee(employees_df, new_employee, employee_file):
     if 'EmployeeID' in new_employee and new_employee['EmployeeID']:
@@ -20,7 +16,6 @@ def add_employee(employees_df, new_employee, employee_file):
     st.success(f"Added new employee with ID {new_employee['EmployeeID']}")
     employees_df.to_csv(employee_file, index=False)
     return employees_df
-
 
 def update_employee(employees_df, employee_id, updated_fields, employee_file):
     if employee_id not in employees_df['EmployeeID'].values:
@@ -32,7 +27,6 @@ def update_employee(employees_df, employee_id, updated_fields, employee_file):
     employees_df.to_csv(employee_file, index=False)
     return employees_df
 
-
 def delete_employee(employees_df, employee_id, employee_file):
     if employee_id not in employees_df['EmployeeID'].values:
         st.error(f"EmployeeID {employee_id} not found. Cannot delete non-existent employee.")
@@ -42,110 +36,77 @@ def delete_employee(employees_df, employee_id, employee_file):
     employees_df.to_csv(employee_file, index=False)
     return employees_df
 
-
 def add_project(projects_df, new_project, project_file):
     projects_df = pd.concat([projects_df, pd.DataFrame([new_project])], ignore_index=True)
     st.success(f"Added new project '{new_project['Project Name']}' with sub task '{new_project['Sub Task']}'")
     projects_df.to_csv(project_file, index=False)
     return projects_df
 
-
 # ---------- Employee transfer functions ----------
-
-
 def move_employee_to_assigned(employee_id, employees_df, employee_file, assigned_file="assigned_employees.csv"):
     """Move employee from employees_df to assigned_employees.csv"""
     if employee_id not in employees_df['EmployeeID'].values:
         return employees_df  # nothing to do
-
     try:
         assigned_df = pd.read_csv(assigned_file)
     except FileNotFoundError:
         assigned_df = pd.DataFrame(columns=employees_df.columns)
-
     emp_row = employees_df[employees_df['EmployeeID'] == employee_id]
-
     # Append to assigned.csv
     assigned_df = pd.concat([assigned_df, emp_row], ignore_index=True)
     assigned_df.to_csv(assigned_file, index=False)
-
     # Remove from employees.csv
     employees_df = employees_df.drop(emp_row.index)
     employees_df.to_csv(employee_file, index=False)
-
     return employees_df
-
 
 def move_employee_back_to_employees(employee_id, employee_file="Employee_with_ID_with_random_skills.csv", assigned_file="assigned_employees.csv"):
     """Move employee back to employee file after task completion"""
     employees_df = pd.read_csv(employee_file)
-
     try:
         assigned_df = pd.read_csv(assigned_file)
     except FileNotFoundError:
         st.warning("No assigned employees file found.")
         return employees_df
-
     if employee_id not in assigned_df['EmployeeID'].values:
         st.warning(f"Employee {employee_id} not found in assigned list.")
         return employees_df
-
     emp_row = assigned_df[assigned_df['EmployeeID'] == employee_id]
-
     # Add back to employees.csv
     employees_df = pd.concat([employees_df, emp_row], ignore_index=True)
     employees_df.to_csv(employee_file, index=False)
-
     # Remove from assigned.csv
     assigned_df = assigned_df.drop(emp_row.index)
     assigned_df.to_csv(assigned_file, index=False)
-
     st.success(f"Employee {employee_id} moved back to employee list after completing task.")
     return employees_df
-
 
 # ---------- File Uploads ----------
 st.sidebar.header("📂 Upload CSV Files")
 employee_file_upload = st.sidebar.file_uploader("Upload Employee CSV", type=["csv"])
 project_file_upload = st.sidebar.file_uploader("Upload Project CSV", type=["csv"])
-
-
 if not employee_file_upload or not project_file_upload:
     st.warning("Please upload both Employee and Project CSV files to proceed.")
     st.stop()
-
-
 employee_file = "Employee_with_ID_with_random_skills.csv"
 project_file = "project_tasks_500.csv"
-
-
 with open(employee_file, "wb") as f:
     f.write(employee_file_upload.getbuffer())
-
-
 with open(project_file, "wb") as f:
     f.write(project_file_upload.getbuffer())
-
 
 # ---------- Load Data ----------
 @st.cache_data
 def load_employees(path):
     return pd.read_csv(path)
-
-
 @st.cache_data
 def load_projects(path):
     df = pd.read_csv(path)
     df['Deadline'] = pd.to_datetime(df['Deadline'], errors='coerce')
     return df
-
-
 employees = load_employees(employee_file)
 projects = load_projects(project_file)
-
-
 st.title("Employee and Project Management Dashboard")
-
 
 # ---------- Add new employee ----------
 if st.sidebar.checkbox("Add New Employee"):
@@ -176,7 +137,6 @@ if st.sidebar.checkbox("Add New Employee"):
             }
             employees = add_employee(employees, new_employee, employee_file)
 
-
 # ---------- Update employee ----------
 if st.sidebar.checkbox("Update Employee"):
     employee_id_update = st.text_input("EmployeeID to Update")
@@ -197,7 +157,6 @@ if st.sidebar.checkbox("Update Employee"):
         else:
             st.error("EmployeeID not found.")
 
-
 # ---------- Delete employee ----------
 if st.sidebar.checkbox("Delete Employee"):
     employee_id_delete = st.text_input("EmployeeID to Delete")
@@ -206,7 +165,6 @@ if st.sidebar.checkbox("Delete Employee"):
             employees = delete_employee(employees, employee_id_delete, employee_file)
         else:
             st.warning("Please enter EmployeeID to delete.")
-
 
 # ---------- Add project ----------
 if st.sidebar.checkbox("Add New Project"):
@@ -225,7 +183,6 @@ if st.sidebar.checkbox("Add New Project"):
             }
             projects = add_project(projects, new_project, project_file)
 
-
 # ---------- Assign Projects ----------
 projects_sorted = projects.sort_values(by='Deadline').reset_index(drop=True)
 assignments = []
@@ -238,7 +195,6 @@ try:
 except FileNotFoundError:
     assigned_employees_df = pd.DataFrame(columns=employees.columns)
     assigned_ids = set()
-
 for i, task in projects_sorted.iterrows():
     available_employees = [
         e for e in employees['EmployeeID'].tolist()
@@ -250,7 +206,6 @@ for i, task in projects_sorted.iterrows():
         assigned_employee = random.choice(available_employees)
         employee_project_map.setdefault(assigned_employee, set()).add(task['Project Name'])
         employees = move_employee_to_assigned(assigned_employee, employees, employee_file)
-
     assignments.append({
         'Project Name': task['Project Name'],
         'Deadline': task['Deadline'],
@@ -258,7 +213,6 @@ for i, task in projects_sorted.iterrows():
         'Skills Required': task['Skills Required'],
         'Assigned EmployeeID': assigned_employee
     })
-
 df_assignments = pd.DataFrame(assignments)
 df_assignments.to_csv("project_task_assignments.csv", index=False)
 st.success("✅ Assignments saved to project_task_assignments.csv")
@@ -269,36 +223,23 @@ try:
     assigned_employees_df = pd.read_csv("assigned_employees.csv")
 except FileNotFoundError:
     assigned_employees_df = pd.DataFrame(columns=employees.columns)
-
 st.subheader("Assigned Employees")
 st.dataframe(assigned_employees_df)
-
 csv_data = assigned_employees_df.to_csv(index=False).encode('utf-8')
 st.download_button(label="Download Assigned Employees CSV", data=csv_data, file_name="assigned_employees.csv", mime='text/csv')
 
-
 # ---------- Auto-move employees back if deadline passed ----------
 today = pd.to_datetime(datetime.now().date())
-
 # Reload assigned employees
 try:
     assigned_employees_df = pd.read_csv("assigned_employees.csv")
 except FileNotFoundError:
     assigned_employees_df = pd.DataFrame(columns=employees.columns)
-
 # Reload assignments
 assignments_df = pd.read_csv("project_task_assignments.csv")
 assignments_df['Deadline'] = pd.to_datetime(assignments_df['Deadline'], errors='coerce')
-
 # Check deadlines
 for _, row in assignments_df.iterrows():
     if pd.notnull(row['Deadline']) and row['Deadline'] < today and pd.notnull(row['Assigned EmployeeID']):
         emp_id = row['Assigned EmployeeID']
         employees = move_employee_back_to_employees(emp_id, employee_file)
-
-
-# ---------- Mark Task Completed ----------
-if st.sidebar.checkbox("Mark Task Completed"):
-    emp_complete = st.text_input("Enter EmployeeID who completed task")
-    if st.button("Mark Completed"):
-        employees = move_employee_back_to_employees(emp_complete, employee_file)
