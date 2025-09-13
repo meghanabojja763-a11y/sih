@@ -43,11 +43,9 @@ def add_project(projects_df, new_project, project_file):
     projects_df.to_csv(project_file, index=False)
     return projects_df
 
-# ---------- Employee transfer functions ----------
-
 def move_employee_to_assigned(employee_id, employees_df, employee_file, assigned_file="assigned_employees.csv"):
     if employee_id not in employees_df['EmployeeID'].values:
-        return employees_df  
+        return employees_df
     try:
         with open(assigned_file) as f:
             content = f.read().strip()
@@ -59,7 +57,6 @@ def move_employee_to_assigned(employee_id, employees_df, employee_file, assigned
         assigned_df = pd.DataFrame(columns=employees_df.columns)
     except pd.errors.EmptyDataError:
         assigned_df = pd.DataFrame(columns=employees_df.columns)
-
     emp_row = employees_df[employees_df['EmployeeID'] == employee_id]
     assigned_df = pd.concat([assigned_df, emp_row], ignore_index=True)
     assigned_df.to_csv(assigned_file, index=False)
@@ -67,7 +64,7 @@ def move_employee_to_assigned(employee_id, employees_df, employee_file, assigned
     employees_df.to_csv(employee_file, index=False)
     return employees_df
 
-# File Uploads
+# File Uploads & loading CSVs
 st.sidebar.header("📂 Upload CSV Files")
 employee_file_upload = st.sidebar.file_uploader("Upload Employee CSV", type=["csv"])
 project_file_upload = st.sidebar.file_uploader("Upload Project CSV", type=["csv"])
@@ -78,6 +75,7 @@ if not employee_file_upload or not project_file_upload:
 
 employee_file = "Employee_with_ID_with_random_skills.csv"
 project_file = "project_tasks_500.csv"
+completed_file = "completed_tasks.csv"
 
 with open(employee_file, "wb") as f:
     f.write(employee_file_upload.getbuffer())
@@ -99,7 +97,30 @@ projects = load_projects(project_file)
 
 st.title("Employee and Project Management Dashboard")
 
-# Add new employee
+# Cleanup completed tasks based on deadline
+today = pd.to_datetime(datetime.now().date())
+# Separate tasks past deadline to completed tasks csv and remove from projects
+if not projects.empty:
+    completed_tasks = projects[projects['Deadline'] < today]
+    ongoing_tasks = projects[projects['Deadline'] >= today]
+else:
+    completed_tasks = pd.DataFrame()
+    ongoing_tasks = projects
+
+# Append completed tasks to completed_tasks.csv
+try:
+    completed_existing = pd.read_csv(completed_file)
+    completed_tasks_full = pd.concat([completed_existing, completed_tasks], ignore_index=True)
+except (FileNotFoundError, pd.errors.EmptyDataError):
+    completed_tasks_full = completed_tasks
+
+completed_tasks_full.to_csv(completed_file, index=False)
+# Overwrite project tasks file with ongoing tasks only
+ongoing_tasks.to_csv(project_file, index=False)
+
+projects = ongoing_tasks
+
+# Add new employee form
 if st.sidebar.checkbox("Add New Employee"):
     with st.form("add_employee_form"):
         education = st.text_input("Education")
@@ -218,3 +239,10 @@ try:
     st.dataframe(assigned_emps)
 except (FileNotFoundError, pd.errors.EmptyDataError):
     st.write("No assigned employees yet.")
+
+try:
+    completed_df = pd.read_csv(completed_file)
+    st.write("Completed Tasks")
+    st.dataframe(completed_df)
+except (FileNotFoundError, pd.errors.EmptyDataError):
+    st.write("No completed tasks yet.")
