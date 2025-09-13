@@ -49,9 +49,17 @@ def move_employee_to_assigned(employee_id, employees_df, employee_file, assigned
     if employee_id not in employees_df['EmployeeID'].values:
         return employees_df  
     try:
-        assigned_df = pd.read_csv(assigned_file)
+        with open(assigned_file) as f:
+            content = f.read().strip()
+        if not content:
+            assigned_df = pd.DataFrame(columns=employees_df.columns)
+        else:
+            assigned_df = pd.read_csv(assigned_file)
     except FileNotFoundError:
         assigned_df = pd.DataFrame(columns=employees_df.columns)
+    except pd.errors.EmptyDataError:
+        assigned_df = pd.DataFrame(columns=employees_df.columns)
+
     emp_row = employees_df[employees_df['EmployeeID'] == employee_id]
     assigned_df = pd.concat([assigned_df, emp_row], ignore_index=True)
     assigned_df.to_csv(assigned_file, index=False)
@@ -174,7 +182,7 @@ employee_project_map = {}
 try:
     assigned_employees_df = pd.read_csv("assigned_employees.csv")
     assigned_ids = set(assigned_employees_df['EmployeeID'].values)
-except FileNotFoundError:
+except (FileNotFoundError, pd.errors.EmptyDataError):
     assigned_ids = set()
 
 for i, task in projects_sorted.iterrows():
@@ -208,5 +216,5 @@ try:
     assigned_emps = pd.read_csv("assigned_employees.csv")
     st.write("Currently Assigned Employees")
     st.dataframe(assigned_emps)
-except FileNotFoundError:
+except (FileNotFoundError, pd.errors.EmptyDataError):
     st.write("No assigned employees yet.")
