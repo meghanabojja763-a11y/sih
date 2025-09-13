@@ -88,8 +88,10 @@ project_file_upload = st.sidebar.file_uploader("Upload Project CSV", type=["csv"
 if not employee_file_upload or not project_file_upload:
     st.warning("Please upload both Employee and Project CSV files to proceed.")
     st.stop()
+
 employee_file = "Employee_with_ID_with_random_skills.csv"
 project_file = "project_tasks_500.csv"
+
 with open(employee_file, "wb") as f:
     f.write(employee_file_upload.getbuffer())
 with open(project_file, "wb") as f:
@@ -106,6 +108,7 @@ def load_projects(path):
     return df
 employees = load_employees(employee_file)
 projects = load_projects(project_file)
+
 st.title("Employee and Project Management Dashboard")
 
 # ---------- Add new employee ----------
@@ -195,6 +198,7 @@ try:
 except FileNotFoundError:
     assigned_employees_df = pd.DataFrame(columns=employees.columns)
     assigned_ids = set()
+
 for i, task in projects_sorted.iterrows():
     available_employees = [
         e for e in employees['EmployeeID'].tolist()
@@ -206,6 +210,7 @@ for i, task in projects_sorted.iterrows():
         assigned_employee = random.choice(available_employees)
         employee_project_map.setdefault(assigned_employee, set()).add(task['Project Name'])
         employees = move_employee_to_assigned(assigned_employee, employees, employee_file)
+
     assignments.append({
         'Project Name': task['Project Name'],
         'Deadline': task['Deadline'],
@@ -213,6 +218,7 @@ for i, task in projects_sorted.iterrows():
         'Skills Required': task['Skills Required'],
         'Assigned EmployeeID': assigned_employee
     })
+
 df_assignments = pd.DataFrame(assignments)
 df_assignments.to_csv("project_task_assignments.csv", index=False)
 st.success("✅ Assignments saved to project_task_assignments.csv")
@@ -228,18 +234,44 @@ st.dataframe(assigned_employees_df)
 csv_data = assigned_employees_df.to_csv(index=False).encode('utf-8')
 st.download_button(label="Download Assigned Employees CSV", data=csv_data, file_name="assigned_employees.csv", mime='text/csv')
 
-# ---------- Auto-move employees back if deadline passed ----------
-today = pd.to_datetime(datetime.now().date())
+# ---------- Auto-move employees back if deadline passed and handle completed tasks ----------
 # Reload assigned employees
 try:
     assigned_employees_df = pd.read_csv("assigned_employees.csv")
 except FileNotFoundError:
     assigned_employees_df = pd.DataFrame(columns=employees.columns)
+
 # Reload assignments
 assignments_df = pd.read_csv("project_task_assignments.csv")
 assignments_df['Deadline'] = pd.to_datetime(assignments_df['Deadline'], errors='coerce')
-# Check deadlines
-for _, row in assignments_df.iterrows():
-    if pd.notnull(row['Deadline']) and row['Deadline'] < today and pd.notnull(row['Assigned EmployeeID']):
-        emp_id = row['Assigned EmployeeID']
-        employees = move_employee_back_to_employees(emp_id, employee_file)
+
+# Load or create completed tasks dataframe
+try:
+    completed_tasks_df = pd.read_csv("completed_task.csv")
+except FileNotFoundError:
+    completed_tasks_df = pd.DataFrame(columns=assignments_df.columns)
+
+# Today's date for comparisons
+today = pd.to_datetime(datetime.now().date())
+
+# Find tasks past deadline and with assigned employee
+past_due_mask = (assignments_df['Deadline'] < today) & assignments_df['Assigned EmployeeID'].notnull()
+
+# Move past due tasks to completed_tasks_df
+completed_tasks_df = pd.concat([completed_tasks_df, assignments_df[past_due_mask]], ignore_index=True)
+completed_tasks_df.to_csv("completed_task.csv", index=False)
+
+# Remove past due tasks from assignments_df
+assignments_df = assignments_df[~past_due_mask]
+assignments_df.to_csv("project_task_assignments.csv", index=False)
+
+# Auto-move employees back for completed tasks
+for _, row in completed_tasks_df.iterrows():
+    emp_id = row['Assigned EmployeeID']
+    employees = move_employee_back_to_employees(emp_id, employee_file)
+
+# Show completed tasks dataframe and download button
+st.subheader("Completed Tasks")
+st.dataframe(completed_tasks_df)
+completed_csv_data = completed_tasks_df.to_csv(index=False).encode('utf-8')
+st.download_button(label="Download Completed Tasks CSV", data=completed_csv_data, file_name="completed_task.csv", mime='text/csv')
