@@ -7,7 +7,7 @@ from datetime import datetime
 # ---------- Utility Functions ----------
 
 def generate_unique_employee_id():
-    return "E" + str(uuid.uuid4()).split('-')[0]  # e.g. E4a59bf4e
+    return "E" + str(uuid.uuid4()).split('-')[0]
 
 def add_employee(employees_df, new_employee, employee_file):
     if 'EmployeeID' in new_employee and new_employee['EmployeeID']:
@@ -20,7 +20,7 @@ def add_employee(employees_df, new_employee, employee_file):
 
 def update_employee(employees_df, employee_id, updated_fields, employee_file):
     if employee_id not in employees_df['EmployeeID'].values:
-        st.error(f"EmployeeID {employee_id} not found. Cannot update non-existent employee.")
+        st.error(f"EmployeeID {employee_id} not found.")
         return employees_df
     for key, value in updated_fields.items():
         employees_df.loc[employees_df['EmployeeID'] == employee_id, key] = value
@@ -30,7 +30,7 @@ def update_employee(employees_df, employee_id, updated_fields, employee_file):
 
 def delete_employee(employees_df, employee_id, employee_file):
     if employee_id not in employees_df['EmployeeID'].values:
-        st.error(f"EmployeeID {employee_id} not found. Cannot delete non-existent employee.")
+        st.error(f"EmployeeID {employee_id} not found.")
         return employees_df
     employees_df = employees_df.drop(employees_df[employees_df['EmployeeID'] == employee_id].index)
     st.success(f"Deleted employee with ID {employee_id}")
@@ -39,7 +39,7 @@ def delete_employee(employees_df, employee_id, employee_file):
 
 def add_project(projects_df, new_project, project_file):
     projects_df = pd.concat([projects_df, pd.DataFrame([new_project])], ignore_index=True)
-    st.success(f"Added new project '{new_project['Project Name']}' with sub task '{new_project['Sub Task']}'")
+    st.success(f"Added project '{new_project['Project Name']}'")
     projects_df.to_csv(project_file, index=False)
     return projects_df
 
@@ -53,9 +53,7 @@ def move_employee_to_assigned(employee_id, employees_df, employee_file, assigned
             assigned_df = pd.DataFrame(columns=employees_df.columns)
         else:
             assigned_df = pd.read_csv(assigned_file)
-    except FileNotFoundError:
-        assigned_df = pd.DataFrame(columns=employees_df.columns)
-    except pd.errors.EmptyDataError:
+    except (FileNotFoundError, pd.errors.EmptyDataError):
         assigned_df = pd.DataFrame(columns=employees_df.columns)
     emp_row = employees_df[employees_df['EmployeeID'] == employee_id]
     assigned_df = pd.concat([assigned_df, emp_row], ignore_index=True)
@@ -64,13 +62,14 @@ def move_employee_to_assigned(employee_id, employees_df, employee_file, assigned
     employees_df.to_csv(employee_file, index=False)
     return employees_df
 
-# File Uploads & loading CSVs
-st.sidebar.header("📂 Upload CSV Files")
+
+# Upload files
+st.sidebar.header("Upload CSV Files")
 employee_file_upload = st.sidebar.file_uploader("Upload Employee CSV", type=["csv"])
 project_file_upload = st.sidebar.file_uploader("Upload Project CSV", type=["csv"])
 
 if not employee_file_upload or not project_file_upload:
-    st.warning("Please upload both Employee and Project CSV files to proceed.")
+    st.warning("Upload Employee and Project CSV files to proceed.")
     st.stop()
 
 employee_file = "Employee_with_ID_with_random_skills.csv"
@@ -97,9 +96,8 @@ projects = load_projects(project_file)
 
 st.title("Employee and Project Management Dashboard")
 
-# Cleanup completed tasks based on deadline
+# Move past-deadline projects to completed
 today = pd.to_datetime(datetime.now().date())
-# Separate tasks past deadline to completed tasks csv and remove from projects
 if not projects.empty:
     completed_tasks = projects[projects['Deadline'] < today]
     ongoing_tasks = projects[projects['Deadline'] >= today]
@@ -107,7 +105,6 @@ else:
     completed_tasks = pd.DataFrame()
     ongoing_tasks = projects
 
-# Append completed tasks to completed_tasks.csv
 try:
     completed_existing = pd.read_csv(completed_file)
     completed_tasks_full = pd.concat([completed_existing, completed_tasks], ignore_index=True)
@@ -115,12 +112,19 @@ except (FileNotFoundError, pd.errors.EmptyDataError):
     completed_tasks_full = completed_tasks
 
 completed_tasks_full.to_csv(completed_file, index=False)
-# Overwrite project tasks file with ongoing tasks only
 ongoing_tasks.to_csv(project_file, index=False)
-
 projects = ongoing_tasks
 
-# Add new employee form
+# Safe sort
+projects['Deadline'] = pd.to_datetime(projects['Deadline'], errors='coerce')
+if projects.empty or projects['Deadline'].isnull().all():
+    projects_sorted = projects
+else:
+    projects_sorted = projects.sort_values(by='Deadline').reset_index(drop=True)
+
+# Add/Update/Delete employee UI (same as above, omitted here for brevity)
+
+# Add new employee
 if st.sidebar.checkbox("Add New Employee"):
     with st.form("add_employee_form"):
         education = st.text_input("Education")
@@ -152,22 +156,21 @@ if st.sidebar.checkbox("Add New Employee"):
 # Update employee
 if st.sidebar.checkbox("Update Employee"):
     employee_id_update = st.text_input("EmployeeID to Update")
-    if employee_id_update:
-        if employee_id_update in employees['EmployeeID'].values:
-            with st.form("update_employee_form"):
-                city_upd = st.text_input("Updated City")
-                payment_tier_upd = st.number_input("Updated Payment Tier", 1)
-                skills_upd = st.text_input("Updated skills (comma separated)")
-                submit_upd = st.form_submit_button("Update Employee")
-                if submit_upd:
-                    updated_fields = {
-                        'City': city_upd,
-                        'PaymentTier': payment_tier_upd,
-                        'skills': skills_upd
-                    }
-                    employees = update_employee(employees, employee_id_update, updated_fields, employee_file)
-        else:
-            st.error("EmployeeID not found.")
+    if employee_id_update and employee_id_update in employees['EmployeeID'].values:
+        with st.form("update_employee_form"):
+            city_upd = st.text_input("Updated City")
+            payment_tier_upd = st.number_input("Updated Payment Tier", 1)
+            skills_upd = st.text_input("Updated skills (comma separated)")
+            submit_upd = st.form_submit_button("Update Employee")
+            if submit_upd:
+                updated_fields = {
+                    'City': city_upd,
+                    'PaymentTier': payment_tier_upd,
+                    'skills': skills_upd
+                }
+                employees = update_employee(employees, employee_id_update, updated_fields, employee_file)
+    elif employee_id_update:
+        st.error("EmployeeID not found.")
 
 # Delete employee
 if st.sidebar.checkbox("Delete Employee"):
@@ -178,7 +181,7 @@ if st.sidebar.checkbox("Delete Employee"):
         else:
             st.warning("Please enter EmployeeID to delete.")
 
-# Add project
+# Add new project
 if st.sidebar.checkbox("Add New Project"):
     with st.form("add_project_form"):
         project_name = st.text_input("Project Name")
@@ -196,7 +199,6 @@ if st.sidebar.checkbox("Add New Project"):
             projects = add_project(projects, new_project, project_file)
 
 # Assign Projects
-projects_sorted = projects.sort_values(by='Deadline').reset_index(drop=True)
 assignments = []
 employee_project_map = {}
 
